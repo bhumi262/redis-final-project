@@ -1,0 +1,85 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Redis server
+  apt:
+    name: redis-server
+    state: present
+
+- name: Copy Redis configuration file
+  template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: '0640'
+  notify: Restart Redis
+
+- name: Ensure Redis is enabled and started
+  systemd:
+    name: redis-server
+    enabled: yes
+    state: started
+
+    # ---------- Docker Setup ----------
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker is enabled and started
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+# ---------- Deploy Flask Dashboard App ----------
+- name: Copy app files to server
+  copy:
+    src: "{{ item }}"
+    dest: /home/ubuntu/myapp/
+  loop:
+    - app.py
+    - requirements.txt
+    - Dockerfile
+
+- name: Copy templates folder
+  copy:
+    src: templates/
+    dest: /home/ubuntu/myapp/templates/
+
+- name: Copy static folder
+  copy:
+    src: static/
+    dest: /home/ubuntu/myapp/static/
+
+- name: Build Docker image for the app
+  community.docker.docker_image:
+    name: redis-dashboard
+    build:
+      path: /home/ubuntu/myapp
+    source: build
+
+- name: Run the app container
+  community.docker.docker_container:
+    name: redis-dashboard-container
+    image: redis-dashboard
+    state: started
+    restart_policy: always
+    ports:
+      - "5000:5000"
+      
+
+- name: Install Python Docker SDK
+  apt:
+    name: python3-docker
+    state: present
