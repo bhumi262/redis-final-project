@@ -1,0 +1,85 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/<tumhara-username>/redis-final-project.git'
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform apply -auto-approve'
+                }
+            }
+        }
+
+        stage('Save EC2 IP') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform output -raw redis_server_public_ip > /tmp/redis_ip.txt'
+                    sh 'echo "EC2 Public IP: $(cat /tmp/redis_ip.txt)"'
+                }
+            }
+        }
+
+        stage('Wait for SSH to be Ready') {
+            steps {
+                sh '''
+                    IP=$(cat /tmp/redis_ip.txt)
+                    echo "Waiting for SSH on $IP..."
+                    for i in $(seq 1 15); do
+                        if nc -z -w5 $IP 22; then
+                            echo "SSH is up!"
+                            exit 0
+                        fi
+                        echo "Not ready yet, retrying in 10s..."
+                        sleep 10
+                    done
+                    echo "SSH never became ready, failing."
+                    exit 1
+                '''
+            }
+        }
+
+        stage('Prepare Inventory') {
+            steps {
+                dir('ansible') {
+                    sh '''
+                        IP=$(cat /tmp/redis_ip.txt)
+                        echo "[redis_server]" > inventory.ini
+                        echo "$IP ansible_user=ubuntu ansible_ssh_private_key_file=/var/lib/jenkins/redis-project/redis-project-key.pem ansible_ssh_common_args='"'"'-o StrictHostKeyChecking=no'"'"'" >> inventory.ini
+                        cat inventory.ini
+                    '''
+                }
+            }
+        }
+
+        stage('Run Ansible Playbook') {
+            steps {
+                dir('ansible') {
+                    sh 'ansible-playbook -i inventory.ini playbook.yml'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Infra created AND app deployed successfully — all in one click!'
+        }
+        failure {
+            echo 'Pipeline failed. Check logs above.'
+        }
+    }
+}
