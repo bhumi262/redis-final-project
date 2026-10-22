@@ -68,13 +68,17 @@
     build:
       path: /home/ubuntu/myapp
     source: build
+    force_source: yes
 
 - name: Run the app container
   community.docker.docker_container:
     name: redis-dashboard-container
     image: redis-dashboard
     state: started
+    recreate: yes
     restart_policy: always
+    env:
+      REDIS_HOST: "{{ ansible_default_ipv4.address }}"
     ports:
       - "5000:5000"
       

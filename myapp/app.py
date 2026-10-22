@@ -1,11 +1,12 @@
 from flask import Flask, jsonify, request, render_template
 import redis
 import time
+import os
 
 app = Flask(__name__)
 
-r = redis.Redis(host='15.252.106.55', port=6379, decode_responses=True)
-
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True, socket_connect_timeout=3)
 @app.route('/')
 def home():
     return render_template('index.html')
