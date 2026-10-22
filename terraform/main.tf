@@ -114,7 +114,8 @@ resource "aws_instance" "redis_server" {
   instance_type          = "t2.micro"
   key_name               = "redis-project-key"
   vpc_security_group_ids = [aws_security_group.redis_sg.id]
-   subnet_id              = aws_subnet.redis_subnet.id
+  subnet_id              = aws_subnet.redis_subnet.id
+  associate_public_ip_address = true
 
   tags = {
     Name = "redis-project-server"
