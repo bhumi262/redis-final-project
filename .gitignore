@@ -2,7 +2,13 @@
 .terraform/
 terraform.tfstate
 terraform.tfstate.backup
-.terraform.lock.hcl
+
 myapp/venv/
 *.pyc
 __pycache__/
+# Terraform local files and state
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform-state-backup.json
+**/terraform.tfvars

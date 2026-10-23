@@ -1,10 +1,12 @@
+
 pipeline {
     agent any
 
     stages {
         stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/bhumi262/redis-final-project.git'
+                git branch: 'main',
+                    url: 'https://github.com/bhumi262/redis-final-project.git'
             }
         }
 
@@ -12,6 +14,14 @@ pipeline {
             steps {
                 dir('terraform') {
                     sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform plan'
                 }
             }
         }
@@ -27,59 +37,83 @@ pipeline {
         stage('Save EC2 IP') {
             steps {
                 dir('terraform') {
-                    sh 'terraform output -raw redis_server_public_ip > /tmp/redis_ip.txt'
-                    sh 'echo "EC2 Public IP: $(cat /tmp/redis_ip.txt)"'
-                }
-            }
-        }
-
-        stage('Wait for SSH to be Ready') {
-            steps {
-                sh '''
-                    IP=$(cat /tmp/redis_ip.txt)
-                    echo "Waiting for SSH on $IP..."
-                    for i in $(seq 1 15); do
-                        if nc -z -w5 $IP 22; then
-                            echo "SSH is up!"
-                            exit 0
-                        fi
-                        echo "Not ready yet, retrying in 10s..."
-                        sleep 10
-                    done
-                    echo "SSH never became ready, failing."
-                    exit 1
-                '''
-            }
-        }
-
-        stage('Prepare Inventory') {
-            steps {
-                dir('ansible') {
                     sh '''
-                        IP=$(cat /tmp/redis_ip.txt)
-                        echo "[redis_server]" > inventory.ini
-                        echo "$IP ansible_user=ubuntu ansible_ssh_private_key_file=/var/lib/jenkins/redis-project/redis-project-key.pem ansible_ssh_common_args='"'"'-o StrictHostKeyChecking=no'"'"'" >> inventory.ini
-                        cat inventory.ini
+                        set -eu
+                        terraform output -raw redis_server_public_ip > "$WORKSPACE/redis_ip.txt"
+                        echo "EC2 Public IP saved successfully."
                     '''
                 }
             }
         }
 
-        stage('Run Ansible Playbook') {
+        stage('Wait for SSH') {
+            steps {
+                sh '''
+                    set -eu
+                    IP=$(cat "$WORKSPACE/redis_ip.txt")
+                    echo "Waiting for SSH on $IP..."
+
+                    for i in $(seq 1 15); do
+                        if nc -z -w5 "$IP" 22; then
+                            echo "SSH is ready!"
+                            exit 0
+                        fi
+
+                        echo "Attempt $i: SSH not ready. Retrying in 10 seconds..."
+                        sleep 10
+                    done
+
+                    echo "SSH did not become ready. Check EC2 security group and network."
+                    exit 1
+                '''
+            }
+        }
+
+        stage('Prepare Ansible Inventory') {
+            steps {
+                dir('ansible') {
+                    sh '''
+                        set -eu
+                        IP=$(cat "$WORKSPACE/redis_ip.txt")
+
+                        cat > inventory.ini <<EOF
+[redis_server]
+$IP ansible_user=ubuntu ansible_ssh_private_key_file=/var/lib/jenkins/redis-project/redis-project-key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+EOF
+
+                        echo "Ansible inventory prepared."
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Redis and Application') {
             steps {
                 dir('ansible') {
                     sh 'ansible-playbook -i inventory.ini playbook.yml'
                 }
             }
         }
+
+        stage('Deployment Summary') {
+            steps {
+                sh '''
+                    echo "=================================="
+                    echo "Redis project deployment completed"
+                    echo "EC2 Public IP: $(cat "$WORKSPACE/redis_ip.txt")"
+                    echo "=================================="
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'Infra created AND app deployed successfully — all in one click!'
+            echo 'SUCCESS: Infrastructure and application deployment completed!'
         }
+
         failure {
-            echo 'Pipeline failed. Check logs above.'
+            echo 'FAILED: Check the failed stage logs before retrying.'
         }
     }
 }

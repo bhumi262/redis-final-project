@@ -60,34 +60,26 @@ resource "aws_route_table_association" "redis_rta" {
 
 resource "aws_security_group" "redis_sg" {
   name        = "redis-project-sg"
-   vpc_id      = aws_vpc.redis_vpc.id
   description = "Allow SSH and Redis traffic"
+  vpc_id      = aws_vpc.redis_vpc.id
 
+  # SSH: Only trusted IPs can connect
   ingress {
-    description = "SSH access"
+    description = "SSH from trusted IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.ssh_allowed_cidr]
   }
 
-  ingress {
-    description = "Redis access"
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
-    ingress {
-    description = "Flask app access"
-    from_port   = 5000
-    to_port     = 5000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+
+  # No public Redis ingress rule.
+  # If Flask and Redis run on the same EC2,
+  # configure Flask to connect to 127.0.0.1:6379.
 
   egress {
+    description = "Allow outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -109,13 +101,52 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+
+# IAM role that EC2 will use to connect to SSM
+resource "aws_iam_role" "redis_ssm_role" {
+  name = "redis-project-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [{
+      Effect = "Allow"
+
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+
+      Action = "sts:AssumeRole"
+    }]
+  })
+
+  tags = {
+    Name = "redis-project-ssm-role"
+  }
+}
+
+# Permissions required by SSM Agent
+resource "aws_iam_role_policy_attachment" "redis_ssm_policy" {
+  role = aws_iam_role.redis_ssm_role.name
+
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# Instance profile attaches the IAM role to EC2
+resource "aws_iam_instance_profile" "redis_ssm_profile" {
+  name = "redis-project-ssm-profile"
+  role = aws_iam_role.redis_ssm_role.name
+}
+
+
 resource "aws_instance" "redis_server" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t2.micro"
-  key_name               = "redis-project-key"
-  vpc_security_group_ids = [aws_security_group.redis_sg.id]
-  subnet_id              = aws_subnet.redis_subnet.id
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = "t2.micro"
+  key_name                    = "redis-project-key"
+  vpc_security_group_ids      = [aws_security_group.redis_sg.id]
+  subnet_id                   = aws_subnet.redis_subnet.id
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.redis_ssm_profile.name
 
   tags = {
     Name = "redis-project-server"
