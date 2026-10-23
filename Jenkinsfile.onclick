@@ -18,18 +18,37 @@ pipeline {
             }
         }
 
+        stage('Detect Jenkins Public IP') {
+            steps {
+                sh '''
+                    set -eu
+                    IP=$(curl -4 -fsS https://checkip.amazonaws.com | tr -d '\\n')
+                    echo "$IP/32" > "$WORKSPACE/ssh_allowed_cidr.txt"
+                    echo "Jenkins SSH allowlist: $IP/32"
+                '''
+            }
+        }
+
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    sh 'terraform plan'
-                }
+                  sh '''
+                      set -eu
+                      SSH_CIDR=$(cat "$WORKSPACE/ssh_allowed_cidr.txt")
+                      terraform plan -var="ssh_allowed_cidr=$SSH_CIDR"
+                '''
+        }
             }
         }
 
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -auto-approve'
+                    sh '''
+                        set -eu
+                        SSH_CIDR=$(cat "$WORKSPACE/ssh_allowed_cidr.txt")
+                        terraform apply -auto-approve -var="ssh_allowed_cidr=$SSH_CIDR"
+                    '''
                 }
             }
         }
