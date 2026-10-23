@@ -1,7 +1,7 @@
 variable "ssh_allowed_cidr" {
-  description = "Trusted public IP allowed to SSH"
+  description = "Public IP allowed to access SSH"
   type        = string
-  default     = "103.203.255.2/32"
+  default     = "103.203.255.5/32"
 
   validation {
     condition     = can(cidrnetmask(var.ssh_allowed_cidr))
