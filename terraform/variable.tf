@@ -1,20 +1,21 @@
-
 variable "ssh_allowed_cidr" {
-  description = "Trusted public IP CIDR allowed to SSH, preferably Jenkins egress IP"
+  description = "Trusted public IP allowed to SSH"
   type        = string
+  default     = "103.203.255.2/32"
 
   validation {
     condition     = can(cidrnetmask(var.ssh_allowed_cidr))
-    error_message = "Provide a valid CIDR, for example 203.0.113.10/32."
+    error_message = "Provide a valid CIDR."
   }
 }
 
 variable "app_allowed_cidr" {
-  description = "Trusted client or reverse proxy CIDR allowed to access Flask"
+  description = "Trusted client CIDR for the application"
   type        = string
+  default     = "103.203.255.2/32"
 
   validation {
     condition     = can(cidrnetmask(var.app_allowed_cidr))
-    error_message = "Provide a valid CIDR, for example 203.0.113.10/32."
+    error_message = "Provide a valid CIDR."
   }
 }
