@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -32,12 +31,12 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                  sh '''
-                      set -eu
-                      SSH_CIDR=$(cat "$WORKSPACE/ssh_allowed_cidr.txt")
-                      terraform plan -var="ssh_allowed_cidr=$SSH_CIDR"
-                '''
-        }
+                    sh '''
+                        set -eu
+                        SSH_CIDR=$(cat "$WORKSPACE/ssh_allowed_cidr.txt")
+                        terraform plan -var="ssh_allowed_cidr=$SSH_CIDR" -var="app_allowed_cidr=$SSH_CIDR"
+                    '''
+                }
             }
         }
 
@@ -47,7 +46,7 @@ pipeline {
                     sh '''
                         set -eu
                         SSH_CIDR=$(cat "$WORKSPACE/ssh_allowed_cidr.txt")
-                        terraform apply -auto-approve -var="ssh_allowed_cidr=$SSH_CIDR"
+                        terraform apply -auto-approve -var="ssh_allowed_cidr=$SSH_CIDR" -var="app_allowed_cidr=$SSH_CIDR"
                     '''
                 }
             }
@@ -73,7 +72,7 @@ pipeline {
                     echo "Waiting for SSH on $IP..."
 
                     for i in $(seq 1 15); do
-                        if nc -z -w5 "$IP" 22; then
+                        if nc -vz -w5 "$IP" 22; then
                             echo "SSH is ready!"
                             exit 0
                         fi
@@ -120,6 +119,7 @@ EOF
                     echo "=================================="
                     echo "Redis project deployment completed"
                     echo "EC2 Public IP: $(cat "$WORKSPACE/redis_ip.txt")"
+                    echo "App URL: http://$(cat "$WORKSPACE/redis_ip.txt"):5000"
                     echo "=================================="
                 '''
             }

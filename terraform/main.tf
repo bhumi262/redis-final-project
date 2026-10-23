@@ -72,6 +72,15 @@ resource "aws_security_group" "redis_sg" {
     cidr_blocks = [var.ssh_allowed_cidr]
   }
 
+   # Flask dashboard: only trusted IP range can open the app
+  ingress {
+    description = "Flask app from trusted IP"
+    from_port   = 5000
+    to_port     = 5000
+    protocol    = "tcp"
+    cidr_blocks = [var.app_allowed_cidr]
+  }
+
 
 
   # No public Redis ingress rule.
