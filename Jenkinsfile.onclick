@@ -23,8 +23,8 @@ pipeline {
                 sh '''
                     set -eu
                     IP=$(curl -4 -fsS https://checkip.amazonaws.com | tr -d '\\n')
-                    echo "$IP/32" > "$WORKSPACE/ssh_allowed_cidr.txt"
-                    echo "Jenkins SSH allowlist: $IP/32"
+                    echo "$(echo "$IP" | cut -d. -f1-3).0/24" > "$WORKSPACE/ssh_allowed_cidr.txt"
+                    echo "Jenkins SSH allowlist: $(cat "$WORKSPACE/ssh_allowed_cidr.txt")"
                 '''
             }
         }
