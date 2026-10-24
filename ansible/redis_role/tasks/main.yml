@@ -1,4 +1,5 @@
 ---
+# ---------- Redis Setup ----------
 - name: Update apt cache
   apt:
     update_cache: yes
@@ -23,10 +24,12 @@
     enabled: yes
     state: started
 
-    # ---------- Docker Setup ----------
-- name: Install Docker
+# ---------- Docker Setup ----------
+- name: Install Docker and Python Docker SDK
   apt:
-    name: docker.io
+    name:
+      - docker.io
+      - python3-docker
     state: present
     update_cache: yes
 
@@ -81,9 +84,3 @@
       REDIS_HOST: "{{ ansible_default_ipv4.address }}"
     ports:
       - "5000:5000"
-      
-
-- name: Install Python Docker SDK
-  apt:
-    name: python3-docker
-    state: present
