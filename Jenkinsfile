@@ -115,7 +115,7 @@ EOF
 
                             KEY_FILE=$(mktemp)
                             trap 'rm -f "$KEY_FILE"' EXIT
-                            printf '%s' "$PEM_KEY" | base64 -d > "$KEY_FILE"
+                            printf '%s' "$PEM_KEY" | tr -d ' \r\n' | base64 -d > "$KEY_FILE"
                             chmod 600 "$KEY_FILE"
 
                             cat > inventory.ini <<EOF
