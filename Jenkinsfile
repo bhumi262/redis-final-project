@@ -105,7 +105,7 @@ EOF
             }
         }
 
-               stage('Deploy Redis and Application') {
+        stage('Deploy Redis and Application') {
             steps {
                 withCredentials([string(credentialsId: 'redis-project-key', variable: 'PEM_KEY')]) {
                     dir('ansible') {
