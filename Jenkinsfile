@@ -105,10 +105,27 @@ EOF
             }
         }
 
-        stage('Deploy Redis and Application') {
+               stage('Deploy Redis and Application') {
             steps {
-                dir('ansible') {
-                    sh 'ansible-playbook -i inventory.ini playbook.yml'
+                withCredentials([string(credentialsId: 'redis-project-key', variable: 'PEM_KEY')]) {
+                    dir('ansible') {
+                        sh '''
+                            set -eu
+                            IP=$(cat "$WORKSPACE/redis_ip.txt")
+
+                            KEY_FILE=$(mktemp)
+                            trap 'rm -f "$KEY_FILE"' EXIT
+                            printf '%s\\n' "$PEM_KEY" > "$KEY_FILE"
+                            chmod 600 "$KEY_FILE"
+
+                            cat > inventory.ini <<EOF
+[redis_server]
+$IP ansible_user=ubuntu ansible_ssh_private_key_file=$KEY_FILE ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+EOF
+
+                            ansible-playbook -i inventory.ini playbook.yml
+                        '''
+                    }
                 }
             }
         }
