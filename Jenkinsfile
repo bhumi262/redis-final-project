@@ -5,7 +5,7 @@ pipeline {
     parameters {
         string(
             name: 'APP_ALLOWED_CIDR',
-            defaultValue: '103.203.255.2/32',
+            defaultValue: '103.203.255.50/32',
             description: 'Your public IP/CIDR allowed to access the Flask dashboard'
         )
     }
