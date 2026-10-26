@@ -1,86 +1,51 @@
----
-# ---------- Redis Setup ----------
-- name: Update apt cache
-  apt:
-    update_cache: yes
 
-- name: Install Redis server
-  apt:
-    name: redis-server
+---
+# Install Redis and Sentinel on all private Redis nodes
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install Redis server and Sentinel
+  ansible.builtin.apt:
+    name:
+      - redis-server
+      - redis-sentinel
     state: present
 
-- name: Copy Redis configuration file
-  template:
+# Configure Redis authentication and replication
+- name: Deploy Redis configuration
+  ansible.builtin.template:
     src: redis.conf.j2
     dest: /etc/redis/redis.conf
     owner: redis
     group: redis
-    mode: '0640'
+    mode: "0640"
   notify: Restart Redis
 
-- name: Ensure Redis is enabled and started
-  systemd:
+# Configure Sentinel on each node
+- name: Deploy Sentinel configuration
+  ansible.builtin.template:
+    src: sentinel.conf.j2
+    dest: /etc/redis/sentinel.conf
+    owner: redis
+    group: redis
+    mode: "0640"
+  notify: Restart Sentinel
+
+# Ensure Redis is running before Sentinel starts
+- name: Enable and start Redis
+  ansible.builtin.systemd:
     name: redis-server
     enabled: yes
     state: started
 
-# ---------- Docker Setup ----------
-- name: Install Docker and Python Docker SDK
-  apt:
-    name:
-      - docker.io
-      - python3-docker
-    state: present
-    update_cache: yes
+# Apply pending Redis configuration before starting Sentinel
+- name: Apply Redis configuration changes
+  ansible.builtin.meta: flush_handlers
 
-- name: Ensure Docker is enabled and started
-  systemd:
-    name: docker
+- name: Enable and start Sentinel
+  ansible.builtin.systemd:
+    name: redis-sentinel
     enabled: yes
     state: started
-
-- name: Add ubuntu user to docker group
-  user:
-    name: ubuntu
-    groups: docker
-    append: yes
-
-# ---------- Deploy Flask Dashboard App ----------
-- name: Copy app files to server
-  copy:
-    src: "{{ item }}"
-    dest: /home/ubuntu/myapp/
-  loop:
-    - app.py
-    - requirements.txt
-    - Dockerfile
-
-- name: Copy templates folder
-  copy:
-    src: templates/
-    dest: /home/ubuntu/myapp/templates/
-
-- name: Copy static folder
-  copy:
-    src: static/
-    dest: /home/ubuntu/myapp/static/
-
-- name: Build Docker image for the app
-  community.docker.docker_image:
-    name: redis-dashboard
-    build:
-      path: /home/ubuntu/myapp
-    source: build
-    force_source: yes
-
-- name: Run the app container
-  community.docker.docker_container:
-    name: redis-dashboard-container
-    image: redis-dashboard
-    state: started
-    recreate: yes
-    restart_policy: always
-    env:
-      REDIS_HOST: "{{ ansible_default_ipv4.address }}"
-    ports:
-      - "5000:5000"

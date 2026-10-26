@@ -1,2 +1,10 @@
+
+
 ---
-# defaults file for redis_role
+# Redis Sentinel configuration
+redis_primary_host: "10.0.2.10"
+redis_node_role: "replica"
+
+# Keep the password empty here.
+# Jenkins will provide the actual password securely.
+redis_password: ""

@@ -1,6 +1,95 @@
+
 ---
-- name: Install and configure Redis
-  hosts: redis_server
+- name: Configure Redis and Sentinel nodes
+  hosts: redis_nodes
   become: yes
   roles:
     - redis_role
+  tags:
+    - redis
+
+- name: Deploy Flask dashboard
+  hosts: app_server
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Docker and Python Docker SDK
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - python3-docker
+        state: present
+
+    - name: Ensure Docker is enabled and started
+      ansible.builtin.systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Add ubuntu user to docker group
+      ansible.builtin.user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: /home/ubuntu/myapp
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy Flask application files
+      ansible.builtin.copy:
+        src: "redis_role/files/{{ item }}"
+        dest: "/home/ubuntu/myapp/{{ item }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+      loop:
+        - app.py
+        - requirements.txt
+        - Dockerfile
+
+    - name: Copy templates directory
+      ansible.builtin.copy:
+        src: redis_role/files/templates/
+        dest: /home/ubuntu/myapp/templates/
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Copy static directory
+      ansible.builtin.copy:
+        src: redis_role/files/static/
+        dest: /home/ubuntu/myapp/static/
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Build Flask dashboard image
+      community.docker.docker_image:
+        name: redis-dashboard
+        build:
+          path: /home/ubuntu/myapp
+        source: build
+        force_source: yes
+
+    - name: Run Flask dashboard container
+      community.docker.docker_container:
+        name: redis-dashboard-container
+        image: redis-dashboard
+        state: started
+        recreate: yes
+        restart_policy: always
+        env:
+          REDIS_HOST: "10.0.2.10:26379,10.0.3.10:26379,10.0.2.11:26379"
+          REDIS_PORT: "{{ redis_password }}"
+        ports:
+          - "5000:5000"

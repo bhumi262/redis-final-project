@@ -1,5 +1,11 @@
+
 ---
 - name: Restart Redis
-  systemd:
+  ansible.builtin.systemd:
     name: redis-server
+    state: restarted
+
+- name: Restart Sentinel
+  ansible.builtin.systemd:
+    name: redis-sentinel
     state: restarted
