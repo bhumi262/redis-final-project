@@ -161,11 +161,11 @@ EOF
             }
         }
 
-        // SSH key comes from the Jenkins credential "redis-pem" (Secret text, base64 of the .pem)
+        // SSH key comes from the Jenkins credential "redis-project-key" (Secret text, base64 of the .pem)
         stage('Deploy Redis and Application') {
             when { expression { params.ACTION == 'apply' } }
             steps {
-                withCredentials([string(credentialsId: 'redis-pem', variable: 'PEM_KEY')]) {
+                withCredentials([string(credentialsId: 'redis-project-key', variable: 'PEM_KEY')]) {
                     dir('ansible') {
                         sh '''
                             set -eu
